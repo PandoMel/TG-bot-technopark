@@ -2,27 +2,49 @@
 Роутер для событий группы (join/leave)
 aiogram 3.14
 """
-from aiogram import Router, types
-from aiogram.filters import ChatMemberUpdatedFilter
-from aiogram.types import ChatMemberUpdated, ChatMemberMember
-
-from config import CHANNEL_ID
-from logging_module import get_root_logger
+from aiogram import Router, Bot
+from aiogram.filters import ChatMemberUpdatedFilter, IS_NOT_MEMBER, IS_MEMBER
+from aiogram.types import ChatMemberUpdated
+from config import ADMINS
 
 router = Router()
-root_logger = get_root_logger()
 
+@router.chat_member(ChatMemberUpdatedFilter(member_status_changed=IS_NOT_MEMBER >> IS_MEMBER))
+async def user_joined_chat(event: ChatMemberUpdated, bot: Bot):
+    admin_ids = ADMINS
+    user = event.new_chat_member.user
+    user_id = user.id
+    username = f"@{user.username}" if user.username else "отсутствует"
+    full_name = user.full_name
+    chat_id = event.chat.id
+    message_sms = (
+        f"Новый пользователь вступил в чат:\n"
+        f"ID: {user_id}\n"
+        f"ChatID: {chat_id}\n"
+        f"Name: {username}, full: {full_name}"
+    )
+    for admin_id in admin_ids:
+        try:
+            await bot.send_message(admin_id, message_sms)
+        except Exception as e:
+            print(f"Не удалось отправить сообщение администратору {admin_id}: {e}")
 
-@router.my_chat_member(ChatMemberUpdatedFilter(
-    member_status_changed=True
-))
-async def my_chat_member_handler(update: ChatMemberUpdated):
-    """Обработка событий join/leave группы"""
-    
-    if update.new_chat_member.status == 'member':
-        # Бот добавлен в группу
-        root_logger.info(f"Bot joined group {update.chat.title} (id: {update.chat.id})")
-    
-    elif update.new_chat_member.status == 'left':
-        # Бот удален из группы
-        root_logger.info(f"Bot left group {update.chat.title} (id: {update.chat.id})")
+@router.chat_member(ChatMemberUpdatedFilter(member_status_changed=IS_MEMBER >> IS_NOT_MEMBER))
+async def user_left_chat(event: ChatMemberUpdated, bot: Bot):
+    admin_ids = ADMINS
+    user = event.new_chat_member.user
+    user_id = user.id
+    username = f"@{user.username}" if user.username else "Имя отсутствует"
+    full_name = user.full_name
+    chat_id = event.chat.id
+    message_sms = (
+        f"Пользователь покинул чат:\n"
+        f"ID: {user_id}\n"
+        f"ChatID: {chat_id}\n"
+        f"Name: {username}, full: {full_name}"
+    )
+    for admin_id in admin_ids:
+        try:
+            await bot.send_message(admin_id, message_sms)
+        except Exception as e:
+            print(f"Не удалось отправить сообщение администратору {admin_id}: {e}")
