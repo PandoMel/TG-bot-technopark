@@ -1,0 +1,30 @@
+# Python
+config.py
+2config.py
+logic_registration.md
+
+
+
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+
+
+# Logs
+logs/
+*.log
+
+# PyCharm
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db

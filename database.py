@@ -1,0 +1,126 @@
+"""
+Работа с базой данных в bd.txt
+Формат: "id;company;phone\n"
+"""
+
+
+# Глобальные переменные хранилища
+id = ['None']
+company = ['None']
+phone = ['None']
+
+
+def find_in_bd(usr_id: str):
+    """
+    Поиск организации по ID пользователя.
+    Возвращает название компании или "null" если не найдено.
+    """
+    z = -1
+    print(usr_id)
+    for j in range(len(id)):
+        if str(id[j]) == str(usr_id):
+            z = j
+    if z == -1:
+        c = "null"
+    else:
+        c = company[z]
+    return c
+
+
+def find_by_name(a: str):
+    """
+    Поиск организации по имени.
+    Возвращает: индекс найденного, -1 если не найдено, -2 если найдено несколько.
+    """
+    if len(id) == 0:
+        print(id)
+        load_bd()
+    c = -1
+    n = 0
+    a = a.lower()
+    for j in range(len(company)):
+        b = company[j].lower()
+        if b.find(a) > -1:
+            c = j
+            n = n + 1
+    if c == -1:
+        for j in range(len(id)):
+            if id[j].find(a) > -1:
+                c = j
+                n = n + 1
+    if n > 1:
+        c = -2
+    return c
+
+
+def find_return_ID(usr_id: str):
+    """
+    Поиск индекса пользователя по ID.
+    Возвращает индекс или -1 если не найден.
+    """
+    for j in range(len(id)):
+        if str(id[j]) == str(usr_id):
+            return j
+    return -1
+
+
+def input_bd(usr_id, company_usr, phone_contact):
+    """
+    Добавление новой записи в базу данных.
+    Убирает символы новой строки из названия компании.
+    """
+    company_usr = company_usr.replace('\n', ' ')
+    id.append(str(usr_id))
+    company.append(str(company_usr))
+    print(str(phone_contact))
+    phone.append(str(phone_contact))
+    return ()
+
+
+def del_bd(a: int):
+    """Удаление записи по индексу в массиве"""
+    if len(id) == 0:
+        load_bd()
+    id.pop(a)
+    company.pop(a)
+    phone.pop(a)
+    save_bd()
+
+
+def save_bd():
+    """Сохранение базы данных из массивов в файл bd.txt"""
+    with open('bd.txt', 'w', encoding='utf-8') as f:
+        l = len(id)
+        f.write(str(l - 1) + '\n')
+        for i in range(1, l):
+            f.write(str(id[i]) + ';')
+            f.write(str(company[i]) + ';')
+            f.write(str(phone[i]) + '\n')
+    return
+
+
+def load_bd():
+    """
+    Загрузка базы данных из файла bd.txt в глобальные массивы.
+    Формат файла: первая строка - количество записей, остальные - "id;company;phone"
+    """
+    if len(id) > 1:
+        return ()
+    
+    company[0] = "None"
+    id[0] = "None"
+    phone[0] = "None"
+    
+    f = open('bd.txt', 'r', encoding='utf-8')
+    tmp_l = f.read().splitlines()
+    f.close()
+    
+    print('База данных загружена из файла', len(tmp_l))
+    
+    ll = int(tmp_l[0])
+    for i in range(ll):
+        data = tmp_l[i + 1].split(";")
+        id.append(data[0])
+        company.append(data[1])
+        phone.append(data[2])
+    return ()
