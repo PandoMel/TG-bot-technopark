@@ -13,7 +13,7 @@ from keyboards import builder, key_builder, builder2
 from database import load_bd, find_in_bd, input_bd, save_bd
 from services import check_members, can_send_message
 from FSMstates import Form
-from log_config import root_logger, ohrana_logger
+from logging_module import root_logger, ohrana_logger
 from html_export import to_html
 
 router = Router()

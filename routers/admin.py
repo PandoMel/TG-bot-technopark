@@ -11,7 +11,7 @@ from config import bot, CHANNEL_ID
 from keyboards import adm_keys, get_delete_button
 from database import load_bd, find_by_name, id, company, phone, del_bd, save_bd, find_return_ID
 from FSMstates import Form
-from log_config import root_logger
+from logging_module import root_logger
 from services import tail, tail_len
 
 router = Router()
@@ -151,4 +151,3 @@ async def run_load_bd(query: types.CallbackQuery):
     phone.append("None")
     load_bd()
     await query.message.answer('БД перезагружена.')
-

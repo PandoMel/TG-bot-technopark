@@ -6,7 +6,7 @@ from datetime import datetime
 from aiogram import types
 from config import bot, CHANNEL_ID, TIME_WINDOW
 from database import sent_messages
-from log_config import root_logger
+from logging_module import root_logger
 
 async def check_members(message: types.Message):
     user_channel = await bot.get_chat_member(chat_id=CHANNEL_ID, user_id=message.from_user.id)
