@@ -1,13 +1,23 @@
 """
-Работа с базой данных в bd.txt
-Формат: "id;company;phone\n"
+Модуль реализует простую файловую базу данных (bd.txt) на основе списков Python с кэшированием в памяти. 
 """
 from array import array
 
-# Глобальные переменные БД
-id = array('w', [])
-company = array('w', [])
-phone = array('w', [])
+# Глобальные переменные БД, не менять!
+"""
+Глобальные списки для хранения данных БД в памяти (переопределяют array).
+Инициализируются с фиктивным нулевым элементом ['None'], чтобы избежать IndexError 
+при обращении к id[0] во время загрузки или поиска.
+"""
+
+id = array('w',[]) # dict()#
+company = array('w',[]) # dict() #
+tmp_l = dict() #array('w',[])
+company=['None'] #company=['Администрация','abcde']
+id= ['None'] #id= ['111', '222', '333', '444']
+fio= ['None']
+phone= ['None']
+
 sent_messages = {}
 
 def find_in_bd(usr_id: str):
