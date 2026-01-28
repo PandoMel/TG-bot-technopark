@@ -200,7 +200,7 @@ REPAIR_CATEGORY_LABELS = {
     "repair_cat_water": "Вода/Отопление",
     "repair_cat_other": "Другое",
 }
-
+#убрать отображение данных(от кого) для пользователя, но отправлять полные данные в греппу AXO_ID
 def build_repair_message(data: dict, user: types.User) -> str:
     username = f"@{user.username}" if user.username else "не указан"
     return (
@@ -290,6 +290,12 @@ async def send_repair_request(query: types.CallbackQuery, state: FSMContext):
         await state.clear()
         return
     data = await state.get_data()
+    #check data !=None
+    if not data or not data.get("repair_description"):
+        await query.message.answer("Ошибка: данные заявки утеряны (время сессии истекло). Пожалуйста, заполните заявку заново.")
+        await state.clear()
+        return
+    
     message_text = build_repair_message(data, query.from_user)
     media_type = data.get("repair_media_type")
     media_id = data.get("repair_media_id")
