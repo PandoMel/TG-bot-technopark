@@ -2,7 +2,7 @@
 Бизнес-логика, валидация и антидубликат
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from aiogram import types
 from config import bot, CHANNEL_ID, TIME_WINDOW
 from database import sent_messages

@@ -9,6 +9,9 @@ builder = InlineKeyboardBuilder()
 builder.add(types.InlineKeyboardButton(
     text="Заказать гостевой пропуск",
     callback_data="Заказать пропуск"))
+builder.add(types.InlineKeyboardButton(
+    text="🛠 Заявка на ремонт",
+    callback_data="repair_request"))
 
 keys_after_send = [
     [types.InlineKeyboardButton(text='Инструкция посетителю(авто)', callback_data='man_avto')],
@@ -44,4 +47,30 @@ def get_delete_button(user_id: int):
         text=f'!!! Удалить из группы пользователя {user_id}',
         callback_data=f'del_users_from_group_{user_id}'
     ))
+    return kb.as_markup()
+
+def get_repair_categories_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.add(types.InlineKeyboardButton(text="🚪 Лифт", callback_data="repair_cat_lift"))
+    kb.add(types.InlineKeyboardButton(text="💡 Освещение", callback_data="repair_cat_light"))
+    kb.add(types.InlineKeyboardButton(text="🚿 Вода/Отопление", callback_data="repair_cat_water"))
+    kb.add(types.InlineKeyboardButton(text="🧹 Другое", callback_data="repair_cat_other"))
+    kb.adjust(1)
+    return kb.as_markup()
+
+def get_repair_skip_media_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.add(types.InlineKeyboardButton(text="Пропустить", callback_data="repair_skip_media"))
+    return kb.as_markup()
+
+def get_repair_confirm_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.add(types.InlineKeyboardButton(text="Отправить", callback_data="repair_confirm_send"))
+    kb.add(types.InlineKeyboardButton(text="Отмена", callback_data="repair_confirm_cancel"))
+    kb.adjust(2)
+    return kb.as_markup()
+
+def get_repair_status_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.add(types.InlineKeyboardButton(text="Заявка отработана", callback_data="repair_done"))
     return kb.as_markup()
