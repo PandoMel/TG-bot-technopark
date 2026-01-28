@@ -7,20 +7,36 @@ from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import bot, CHANNEL_ID, OHRANA_ID, manual_avto, manual_peshkom, error_send_propusk
-from keyboards import builder, key_builder, builder2
+from config import (
+    AXO_ID,
+    CHANNEL_ID,
+    OHRANA_ID,
+    REPAIR_REQUESTS_ENABLED,
+    REPAIR_SEND_ENABLED,
+    bot,
+    error_send_propusk,
+    manual_avto,
+    manual_peshkom,
+)
+from keyboards import (
+    adm_button,
+    builder,
+    builder2,
+    get_repair_categories_keyboard,
+    get_repair_confirm_keyboard,
+    get_repair_skip_media_keyboard,
+    get_repair_status_keyboard,
+    key_builder,
+)
 from database import load_bd, find_in_bd, input_bd, save_bd
 from services import check_members, can_send_message
 from FSMstates import Form
-from logging_module import root_logger, ohrana_logger
+from logging_module import root_logger, ohrana_logger, uk_logger
 from html_export import to_html
 
 router = Router()
-
-@dp.message(Command("start")) # Примечание: dp здесь нет, нужно заменить на router
-# В новых роутерах декоратор @router.message, а не @dp.message
-# Исправленный код ниже:
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
@@ -47,8 +63,6 @@ async def cmd_start(message: types.Message, state: FSMContext):
     
     if (check_usr.status == "creator") or (check_usr.status == 'administrator'):
         await asyncio.sleep(0.3)
-        # Импорт adm_button здесь или вверху. Для чистоты лучше импортировать всё вверху.
-        from keyboards import adm_button 
         await message.answer('Вы администратор, дополнительные функции по кнопке ↓', reply_markup=adm_button.as_markup())
         root_logger.warning(f'Admin: {check_usr.status}. ID: {message.from_user.id}')
 
@@ -158,7 +172,7 @@ async def callb_msg(query: types.CallbackQuery, state: FSMContext):
     to_html(dt)
     root_logger.warning(f'Message in OHRANA. ID: {usr.id}, user: {usr.full_name}')
     root_logger.info(msg_text)
-    ohrana_logger.info(f'От {usr_comp} Для: {sms_processed.replace('\n', '. ')}')
+    ohrana_logger.info(f"От {usr_comp} Для: {sms_processed.replace('\n', '. ')}")
     await state.clear()
 
 @router.callback_query(F.data == "cancel")
@@ -179,6 +193,141 @@ async def manual(query: types.CallbackQuery):
     await query.answer()
     await query.message.delete_reply_markup()
     await query.message.answer(text=manual_peshkom, reply_markup=builder.as_markup())
+
+REPAIR_CATEGORY_LABELS = {
+    "repair_cat_lift": "Лифт",
+    "repair_cat_light": "Освещение",
+    "repair_cat_water": "Вода/Отопление",
+    "repair_cat_other": "Другое",
+}
+
+def build_repair_message(data: dict, user: types.User) -> str:
+    username = f"@{user.username}" if user.username else "не указан"
+    return (
+        "Заявка на ремонт\n"
+        f"Категория: {data.get('repair_category')}\n"
+        f"Адрес: {data.get('repair_address')}\n"
+        f"Описание: {data.get('repair_description')}\n"
+        f"От: {username} ({user.full_name}), ID: {user.id}"
+    )
+
+@router.callback_query(F.data == "repair_request")
+async def start_repair_request(query: types.CallbackQuery, state: FSMContext):
+    await query.answer()
+    if not REPAIR_REQUESTS_ENABLED:
+        await query.message.answer("Функция заявок на ремонт временно недоступна.")
+        return
+    await state.clear()
+    await query.message.answer(
+        "Выберите категорию заявки:",
+        reply_markup=get_repair_categories_keyboard()
+    )
+    await state.set_state(Form.repair_category)
+
+@router.callback_query(F.data.in_(REPAIR_CATEGORY_LABELS.keys()))
+async def select_repair_category(query: types.CallbackQuery, state: FSMContext):
+    await query.answer()
+    category = REPAIR_CATEGORY_LABELS.get(query.data)
+    await state.update_data(repair_category=category)
+    await query.message.answer("Укажите адрес (этаж, офис).")
+    await state.set_state(Form.repair_address)
+
+@router.message(Form.repair_address)
+async def input_repair_address(message: Message, state: FSMContext):
+    await state.update_data(repair_address=message.text)
+    await message.answer("Опишите проблему.")
+    await state.set_state(Form.repair_description)
+
+@router.message(Form.repair_description)
+async def input_repair_description(message: Message, state: FSMContext):
+    await state.update_data(repair_description=message.text)
+    await message.answer(
+        "Если есть фото или видео, отправьте их. Если нет — нажмите «Пропустить».",
+        reply_markup=get_repair_skip_media_keyboard()
+    )
+    await state.set_state(Form.repair_media)
+
+@router.callback_query(F.data == "repair_skip_media")
+async def skip_repair_media(query: types.CallbackQuery, state: FSMContext):
+    await query.answer()
+    data = await state.get_data()
+    preview_text = build_repair_message(data, query.from_user)
+    await query.message.answer(
+        f"Проверьте данные заявки:\n\n{preview_text}",
+        reply_markup=get_repair_confirm_keyboard()
+    )
+    await state.set_state(Form.repair_confirm)
+
+@router.message(Form.repair_media)
+async def capture_repair_media(message: Message, state: FSMContext):
+    media_type = None
+    media_id = None
+    if message.photo:
+        media_type = "photo"
+        media_id = message.photo[-1].file_id
+    elif message.video:
+        media_type = "video"
+        media_id = message.video.file_id
+
+    if not media_type or not media_id:
+        await message.answer("Пожалуйста, отправьте фото или видео, либо нажмите «Пропустить».")
+        return
+
+    await state.update_data(repair_media_type=media_type, repair_media_id=media_id)
+    data = await state.get_data()
+    preview_text = build_repair_message(data, message.from_user)
+    await message.answer(
+        f"Проверьте данные заявки:\n\n{preview_text}",
+        reply_markup=get_repair_confirm_keyboard()
+    )
+    await state.set_state(Form.repair_confirm)
+
+@router.callback_query(F.data == "repair_confirm_send")
+async def send_repair_request(query: types.CallbackQuery, state: FSMContext):
+    await query.answer()
+    if not REPAIR_SEND_ENABLED:
+        await query.message.answer("Отправка заявок временно отключена.")
+        await state.clear()
+        return
+    data = await state.get_data()
+    message_text = build_repair_message(data, query.from_user)
+    media_type = data.get("repair_media_type")
+    media_id = data.get("repair_media_id")
+    try:
+        if media_type == "photo":
+            await bot.send_photo(
+                chat_id=AXO_ID,
+                photo=media_id,
+                caption=message_text,
+                reply_markup=get_repair_status_keyboard()
+            )
+        elif media_type == "video":
+            await bot.send_video(
+                chat_id=AXO_ID,
+                video=media_id,
+                caption=message_text,
+                reply_markup=get_repair_status_keyboard()
+            )
+        else:
+            await bot.send_message(
+                chat_id=AXO_ID,
+                text=message_text,
+                reply_markup=get_repair_status_keyboard()
+            )
+    except Exception as exc:
+        root_logger.error(f"Ошибка отправки заявки на ремонт: {exc}")
+        await query.message.answer("Не удалось отправить заявку. Повторите попытку позже.")
+        return
+
+    uk_logger.info(message_text)
+    await query.message.answer("Заявка отправлена. Спасибо!")
+    await state.clear()
+
+@router.callback_query(F.data == "repair_confirm_cancel")
+async def cancel_repair_request(query: types.CallbackQuery, state: FSMContext):
+    await query.answer()
+    await state.clear()
+    await query.message.answer("Заявка отменена.")
 
 @router.message(F.text)
 async def lovim_text(message: types.Message, state: FSMContext):

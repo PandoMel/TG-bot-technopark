@@ -13,3 +13,8 @@ class Form(StatesGroup):
     edit_db_old = State()
     del_elm = State()
     num_phone = State()
+    repair_category = State()
+    repair_address = State()
+    repair_description = State()
+    repair_media = State()
+    repair_confirm = State()
