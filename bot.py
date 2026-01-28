@@ -18,10 +18,13 @@ async def main():
     asyncio.create_task(reset_sent_messages())
     await dp.start_polling(bot)
 
+
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except Exception as e:
-        logging.exception(e)
-        print(e)
+    except KeyboardInterrupt:
+        logging.info("Bot stopped by KeyboardInterrupt")# чтобы стоп не был "ошибкой"
+    except Exception:
+        logging.exception("Bot crashed on startup")
+        raise  # чтобы процесс в docker упал и перезапустился supervisor'ом
 
