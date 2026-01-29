@@ -200,16 +200,25 @@ REPAIR_CATEGORY_LABELS = {
     "repair_cat_water": "Вода/Отопление",
     "repair_cat_other": "Другое",
 }
-#убрать отображение данных(от кого) для пользователя, но отправлять полные данные в греппу AXO_ID
-def build_repair_message(data: dict, user: types.User) -> str:
-    username = f"@{user.username}" if user.username else "не указан"
-    return (
+def build_repair_message(data: dict, user: types.User, include_sender: bool = True) -> str:
+    category = data.get("repair_category") or "—"
+    address = data.get("repair_address") or "—"
+    description = data.get("repair_description") or "—"
+
+    text = (
         "Заявка на ремонт\n"
-        f"Категория: {data.get('repair_category')}\n"
-        f"Адрес: {data.get('repair_address')}\n"
-        f"Описание: {data.get('repair_description')}\n"
-        f"От: {username} ({user.full_name}), ID: {user.id}"
+        f"Категория: {category}\n"
+        f"Адрес: {address}\n"
+        f"Описание: {description}"
     )
+#добавить отображение подписи как записано в bd.txt, удалить дубль user.id из отображения
+    if include_sender:
+        from_bd_name = find_in_bd(user.id)
+        username = f"@{user.username}" if user.username else "не указан"
+        text += f"\nОт: {username} ({user.full_name}), ID: {user.id}\n
+        {from_bd_name}"
+
+    return text
 
 @router.callback_query(F.data == "repair_request")
 async def start_repair_request(query: types.CallbackQuery, state: FSMContext):
@@ -229,20 +238,20 @@ async def select_repair_category(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
     category = REPAIR_CATEGORY_LABELS.get(query.data)
     await state.update_data(repair_category=category)
-    await query.message.answer("Укажите адрес (этаж, офис).")
+    await query.message.answer("Укажите место (адрес/корпус, этаж, офис)")
     await state.set_state(Form.repair_address)
 
 @router.message(Form.repair_address)
 async def input_repair_address(message: Message, state: FSMContext):
     await state.update_data(repair_address=message.text)
-    await message.answer("Опишите проблему.")
+    await message.answer("Опишите проблему")
     await state.set_state(Form.repair_description)
 
 @router.message(Form.repair_description)
 async def input_repair_description(message: Message, state: FSMContext):
     await state.update_data(repair_description=message.text)
     await message.answer(
-        "Если есть фото или видео, отправьте их. Если нет — нажмите «Пропустить».",
+        "Если есть фото или видео, отправьте их. Если нет — нажмите «Пропустить»",
         reply_markup=get_repair_skip_media_keyboard()
     )
     await state.set_state(Form.repair_media)
@@ -251,7 +260,7 @@ async def input_repair_description(message: Message, state: FSMContext):
 async def skip_repair_media(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
     data = await state.get_data()
-    preview_text = build_repair_message(data, query.from_user)
+    preview_text = build_repair_message(data, query.from_user, include_sender=False)
     await query.message.answer(
         f"Проверьте данные заявки:\n\n{preview_text}",
         reply_markup=get_repair_confirm_keyboard()
@@ -270,7 +279,7 @@ async def capture_repair_media(message: Message, state: FSMContext):
         media_id = message.video.file_id
 
     if not media_type or not media_id:
-        await message.answer("Пожалуйста, отправьте фото или видео, либо нажмите «Пропустить».")
+        await message.answer("Пожалуйста, отправьте фото или видео, либо нажмите «Пропустить».") #возможно стоит прикрепить кнопку "Пропустить"
         return
 
     await state.update_data(repair_media_type=media_type, repair_media_id=media_id)
@@ -321,12 +330,14 @@ async def send_repair_request(query: types.CallbackQuery, state: FSMContext):
                 reply_markup=get_repair_status_keyboard()
             )
     except Exception as exc:
-        root_logger.error(f"Ошибка отправки заявки на ремонт: {exc}")
+        #root_logger.error(f"Ошибка отправки заявки на ремонт: {exc}")
+        uk_logger.error(f"Ошибка отправки заявки на ремонт: {exc}")
+        uk_logger.info(message_text)
         await query.message.answer("Не удалось отправить заявку. Повторите попытку позже.")
         return
 
     uk_logger.info(message_text)
-    await query.message.answer("Заявка отправлена. Спасибо!")
+    await query.message.answer("Заявка отправлена!")
     await state.clear()
 
 @router.callback_query(F.data == "repair_confirm_cancel")
