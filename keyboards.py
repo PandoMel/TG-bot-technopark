@@ -3,15 +3,17 @@
 """
 from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from config import REPAIR_REQUESTS_ENABLED, REPAIR_SEND_ENABLED
 
 # Пользовательские кнопки
 builder = InlineKeyboardBuilder()
 builder.add(types.InlineKeyboardButton(
     text="Заказать гостевой пропуск",
     callback_data="Заказать пропуск"))
-builder.add(types.InlineKeyboardButton(
-    text="🛠 Заявка на ремонт",
-    callback_data="repair_request"))
+if REPAIR_REQUESTS_ENABLED and REPAIR_SEND_ENABLED:
+    builder.add(types.InlineKeyboardButton(
+        text="🛠 Заявка на ремонт",
+        callback_data="repair_request"))
 
 keys_after_send = [
     [types.InlineKeyboardButton(text='Инструкция посетителю(авто)', callback_data='man_avto')],
