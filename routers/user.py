@@ -294,10 +294,6 @@ async def capture_repair_media(message: Message, state: FSMContext):
 @router.callback_query(F.data == "repair_confirm_send")
 async def send_repair_request(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
-    if not REPAIR_SEND_ENABLED:
-        await query.message.answer("Отправка заявок временно отключена.")
-        await state.clear()
-        return
     data = await state.get_data()
     #check data !=None
     if not data or not data.get("repair_description"):
