@@ -33,6 +33,9 @@ adm_button.add(types.InlineKeyboardButton(
 
 admKeyList = [
     [types.InlineKeyboardButton(text='Поиск данных пользователя', callback_data='find_bd')],
+    [types.InlineKeyboardButton(text='Профиль пользователя по ID', callback_data='user_profile')],
+    [types.InlineKeyboardButton(text='Просмотреть список компании', callback_data='company_list')],
+    [types.InlineKeyboardButton(text='Показать незарегистрированных в группе', callback_data='unregistered_members')],
     [types.InlineKeyboardButton(text='Редактировать пользователя в БД', callback_data='edit_bd')],
     [types.InlineKeyboardButton(text='Удалить регистрацию пользователя в БД', callback_data='del_bd')],
     [types.InlineKeyboardButton(text='Загрузить БД из файла в память', callback_data='load_bd')],
