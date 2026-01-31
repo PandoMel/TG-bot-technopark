@@ -2,9 +2,11 @@
 Бизнес-логика, валидация и антидубликат
 """
 import asyncio
+import json
 from datetime import datetime, timedelta
+from pathlib import Path
 from aiogram import types
-from config import bot, CHANNEL_ID, TIME_WINDOW
+from config import bot, CHANNEL_ID, PATH_GROUP_MEMBERS, PATH_KPP_LOG, TIME_WINDOW
 from database import sent_messages
 from logging_module import root_logger
 
@@ -72,3 +74,62 @@ def tail_len(f, lines=25):
         log = (read[full_length - lines:])
         print(''.join(log))
         return str(''.join(log))
+
+def load_group_members() -> dict:
+    if not Path(PATH_GROUP_MEMBERS).exists():
+        return {}
+    try:
+        with open(PATH_GROUP_MEMBERS, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+            if isinstance(data, dict):
+                return data
+    except (json.JSONDecodeError, OSError) as exc:
+        root_logger.warning(f"Ошибка чтения файла участников группы: {exc}")
+    return {}
+
+def save_group_members(data: dict) -> None:
+    try:
+        with open(PATH_GROUP_MEMBERS, 'w', encoding='utf-8') as file:
+            json.dump(data, file, ensure_ascii=False, indent=2)
+    except OSError as exc:
+        root_logger.warning(f"Ошибка записи файла участников группы: {exc}")
+
+def add_group_member(user: types.User) -> None:
+    data = load_group_members()
+    data[str(user.id)] = {
+        "username": user.username or "",
+        "full_name": user.full_name,
+        "joined_at": datetime.now().isoformat(timespec='seconds'),
+    }
+    save_group_members(data)
+
+def remove_group_member(user_id: int) -> None:
+    data = load_group_members()
+    data.pop(str(user_id), None)
+    save_group_members(data)
+
+def get_group_member(user_id: int) -> dict | None:
+    data = load_group_members()
+    return data.get(str(user_id))
+
+def list_group_members() -> dict:
+    return load_group_members()
+
+def get_recent_passes_for_user(user_id: int, limit: int = 5) -> list[str]:
+    if not Path(PATH_KPP_LOG).exists():
+        return []
+    try:
+        with open(PATH_KPP_LOG, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+    except OSError as exc:
+        root_logger.warning(f"Ошибка чтения KPP.log: {exc}")
+        return []
+
+    target = f"ID:{user_id}"
+    results = []
+    for line in reversed(lines):
+        if target in line:
+            results.append(line.strip())
+            if len(results) >= limit:
+                break
+    return results

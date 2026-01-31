@@ -6,6 +6,7 @@ from aiogram import Router, Bot
 from aiogram.filters import ChatMemberUpdatedFilter, IS_NOT_MEMBER, IS_MEMBER
 from aiogram.types import ChatMemberUpdated
 from config import ADMINS
+from services import add_group_member, remove_group_member
 
 router = Router()
 
@@ -14,6 +15,7 @@ async def user_joined_chat(event: ChatMemberUpdated, bot: Bot):
     admin_ids = ADMINS
     user = event.new_chat_member.user
     user_id = user.id
+    add_group_member(user)
     username = f"@{user.username}" if user.username else "отсутствует"
     full_name = user.full_name
     chat_id = event.chat.id
@@ -34,6 +36,7 @@ async def user_left_chat(event: ChatMemberUpdated, bot: Bot):
     admin_ids = ADMINS
     user = event.new_chat_member.user
     user_id = user.id
+    remove_group_member(user_id)
     username = f"@{user.username}" if user.username else "Имя отсутствует"
     full_name = user.full_name
     chat_id = event.chat.id

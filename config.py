@@ -22,6 +22,7 @@ PATH_INDEX_HTML = BASE_DIR / "index.html"
 PATH_BOT_LOG = BASE_DIR / "bot.log"
 PATH_KPP_LOG = BASE_DIR / "KPP.log"
 PATH_UK_LOG = BASE_DIR / "UK.log"
+PATH_GROUP_MEMBERS = BASE_DIR / "group_members.json"
 
 # ===== Logging Settings =====
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"

@@ -172,7 +172,8 @@ async def callb_msg(query: types.CallbackQuery, state: FSMContext):
     to_html(dt)
     root_logger.warning(f'Message in OHRANA. ID: {usr.id}, user: {usr.full_name}')
     root_logger.info(msg_text)
-    ohrana_logger.info(f"От {usr_comp} Для: {sms_processed.replace('\n', '. ')}")
+    sms_processed_log = sms_processed.replace('\n', '. ')
+    ohrana_logger.info(f"ID:{usr.id} От {usr_comp} Для: {sms_processed_log}")
     await state.clear()
 
 @router.callback_query(F.data == "cancel")
@@ -211,12 +212,12 @@ def build_repair_message(data: dict, user: types.User, include_sender: bool = Tr
         f"Адрес: {address}\n"
         f"Описание: {description}"
     )
-#добавить отображение подписи как записано в bd.txt, удалить дубль user.id из отображения
     if include_sender:
-        from_bd_name = find_in_bd(user.id)
+        from_bd_name = find_in_bd(str(user.id))
         username = f"@{user.username}" if user.username else "не указан"
-        text += f"\nОт: {username} ({user.full_name}), ID: {user.id}\n
-        {from_bd_name}"
+        text += f"\nОт: {username} ({user.full_name}), ID: {user.id}"
+        if from_bd_name != "null":
+            text += f"\n{from_bd_name}"
 
     return text
 
@@ -341,6 +342,48 @@ async def cancel_repair_request(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
     await state.clear()
     await query.message.answer("Заявка отменена.")
+
+@router.callback_query(F.data == "repair_done")
+async def mark_repair_done(query: types.CallbackQuery):
+    await query.answer()
+    if query.message.chat.id != AXO_ID:
+        return
+    user = query.from_user
+    from_bd_name = find_in_bd(str(user.id))
+    username = f"@{user.username}" if user.username else "не указан"
+    executor = f"{username} ({user.full_name}), ID: {user.id}"
+    if from_bd_name != "null":
+        executor += f", {from_bd_name}"
+
+    done_note = f"\n\n✅ Заявка выполнена: {executor}"
+
+    message_text = query.message.text or ""
+    message_caption = query.message.caption or ""
+    base_text = message_caption if message_caption else message_text
+
+    if "✅ Заявка выполнена" in base_text:
+        await query.message.answer("Заявка уже отмечена как выполненная.")
+        return
+
+    updated_text = f"{base_text}{done_note}"
+    try:
+        if message_caption:
+            await bot.edit_message_caption(
+                chat_id=query.message.chat.id,
+                message_id=query.message.message_id,
+                caption=updated_text,
+                reply_markup=None,
+            )
+        else:
+            await bot.edit_message_text(
+                chat_id=query.message.chat.id,
+                message_id=query.message.message_id,
+                text=updated_text,
+                reply_markup=None,
+            )
+    except Exception as exc:
+        uk_logger.error(f"Ошибка обновления статуса заявки: {exc}")
+        await query.message.answer("Не удалось обновить статус заявки. Повторите позже.")
 
 @router.message(F.text)
 async def lovim_text(message: types.Message, state: FSMContext):
