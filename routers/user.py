@@ -55,7 +55,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         else:
             await message.answer(f'Ваши данные: {id_find}')
             await state.update_data(company_stat=id_find)
-            await message.answer(f"Для оформления пропуска посетителю технопарка нажмите кнопку ↓", reply_markup=builder.as_markup())
+            await message.answer(f"Выберите действие:\n", reply_markup=builder.as_markup())
     else:
         await message.answer("Отказано. Вы должны состоять в специальной группе для доступа к функциям бота.")
         root_logger.info(f'/start: access denied user: {check_usr.user.username}, status: {check_usr.status}')
@@ -63,7 +63,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
     
     if (check_usr.status == "creator") or (check_usr.status == 'administrator'):
         await asyncio.sleep(0.3)
-        await message.answer('Вы администратор, дополнительные функции по кнопке ↓', reply_markup=adm_button.as_markup())
+        await message.answer('Админские функции', reply_markup=adm_button.as_markup())
         root_logger.warning(f'Admin: {check_usr.status}. ID: {message.from_user.id}')
 
 @router.message(lambda message: message.contact is not None, Form.num_phone)
@@ -116,7 +116,7 @@ async def send_zakazat_propusk(query: types.CallbackQuery, state: FSMContext):
         load_bd()
         from_state = (find_in_bd(usr_id=str(query.from_user.id)))
         await state.update_data(company_stat=from_state)
-    await query.message.answer(text=f"Введите данные посетителя:\nДля пешего: фамилия, имя, отчество \nДля автомобиля: Полный номер ТС")
+    await query.message.answer(text=f"Введите данные посетителя:\nДля пешего: фамилия, имя, отчество \nДля автомобиля: полный номер ТС")
     root_logger.warning(f'Load bd. id: {query.from_user.id}')
     await state.set_state(Form.sms)
 
@@ -163,7 +163,7 @@ async def callb_msg(query: types.CallbackQuery, state: FSMContext):
         await query.message.answer(error_send_propusk)
         return
 
-    await asyncio.sleep(1.1)
+    await asyncio.sleep(1)
     await bot.edit_message_text(text=f"Заявка передана на охрану с данными:\n{sms}",
                                 chat_id=query.message.chat.id,
                                 message_id=query.message.message_id,
