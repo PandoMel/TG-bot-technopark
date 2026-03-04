@@ -385,7 +385,4 @@ async def mark_repair_done(query: types.CallbackQuery):
         uk_logger.error(f"Ошибка обновления статуса заявки: {exc}")
         await query.message.answer("Не удалось обновить статус заявки. Повторите позже.")
 
-@router.message(F.text)
-async def lovim_text(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer('Ошибка. Отправляйте данные согласно диалогу.\nИспользуйте команду: /start')
+
