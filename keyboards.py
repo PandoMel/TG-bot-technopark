@@ -8,7 +8,7 @@ from config import REPAIR_REQUESTS_ENABLED, REPAIR_SEND_ENABLED
 # Пользовательские кнопки
 builder = InlineKeyboardBuilder()
 builder.add(types.InlineKeyboardButton(
-    text="Заказать гостевой пропуск",
+    text="🎫 Заказ пропуска",
     callback_data="Заказать пропуск"))
 if REPAIR_REQUESTS_ENABLED and REPAIR_SEND_ENABLED:
     builder.add(types.InlineKeyboardButton(
