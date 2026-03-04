@@ -11,7 +11,7 @@ builder.add(types.InlineKeyboardButton(
     text="🎫 Заказ пропуска",
     callback_data="Заказать пропуск"))
 if REPAIR_REQUESTS_ENABLED and REPAIR_SEND_ENABLED:
-    builder.add(types.InlineKeyboardButton(
+    builder.add(types.InlineKeyboardButton( #builder.row для расположения в 2 строки кнопок, либо builder.add для одной строки
         text="🛠 Заявка на ремонт",
         callback_data="repair_request"))
 
