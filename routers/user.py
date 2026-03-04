@@ -224,12 +224,13 @@ def build_repair_message(data: dict, user: types.User, include_sender: bool = Tr
 @router.callback_query(F.data == "repair_request")
 async def start_repair_request(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     if not REPAIR_REQUESTS_ENABLED:
         await query.message.answer("Функция заявок на ремонт временно недоступна.")
         return
     await state.clear()
     await query.message.answer(
-        "Выберите категорию заявки:",
+        "Выберите категорию заявки",
         reply_markup=get_repair_categories_keyboard()
     )
     await state.set_state(Form.repair_category)
@@ -295,6 +296,7 @@ async def capture_repair_media(message: Message, state: FSMContext):
 @router.callback_query(F.data == "repair_confirm_send")
 async def send_repair_request(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     data = await state.get_data()
     #check data !=None
     if not data or not data.get("repair_description"):
@@ -340,6 +342,7 @@ async def send_repair_request(query: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "repair_confirm_cancel")
 async def cancel_repair_request(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     await state.clear()
     await query.message.answer("Заявка отменена.")
 
