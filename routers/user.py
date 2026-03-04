@@ -55,7 +55,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         else:
             await message.answer(f'Ваши данные: {id_find}')
             await state.update_data(company_stat=id_find)
-            await message.answer(f"Выберите действие:\n", reply_markup=builder.as_markup())
+            await message.answer(f"Выберите действие", reply_markup=builder.as_markup())
     else:
         await message.answer("Отказано. Вы должны состоять в специальной группе для доступа к функциям бота.")
         root_logger.info(f'/start: access denied user: {check_usr.user.username}, status: {check_usr.status}')
@@ -238,9 +238,10 @@ async def start_repair_request(query: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.in_(REPAIR_CATEGORY_LABELS.keys()))
 async def select_repair_category(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     category = REPAIR_CATEGORY_LABELS.get(query.data)
     await state.update_data(repair_category=category)
-    await query.message.answer("Укажите место (адрес/корпус, этаж, офис)")
+    await query.message.answer("Укажите адрес/корпус, этаж, офис")
     await state.set_state(Form.repair_address)
 
 @router.message(Form.repair_address)
