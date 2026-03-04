@@ -262,6 +262,7 @@ async def input_repair_description(message: Message, state: FSMContext):
 @router.callback_query(F.data == "repair_skip_media")
 async def skip_repair_media(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     data = await state.get_data()
     preview_text = build_repair_message(data, query.from_user, include_sender=False)
     await query.message.answer(
