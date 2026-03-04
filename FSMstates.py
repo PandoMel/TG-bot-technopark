@@ -12,6 +12,8 @@ class Form(StatesGroup):
     edit_db_new = State()
     edit_db_old = State()
     del_elm = State()
+    adm_user_profile = State()
+    adm_company_list = State()
     num_phone = State()
     repair_category = State()
     repair_address = State()

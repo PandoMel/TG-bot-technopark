@@ -55,7 +55,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         else:
             await message.answer(f'Ваши данные: {id_find}')
             await state.update_data(company_stat=id_find)
-            await message.answer(f"Для оформления пропуска посетителю технопарка нажмите кнопку ↓", reply_markup=builder.as_markup())
+            await message.answer(f"Выберите действие", reply_markup=builder.as_markup())
     else:
         await message.answer("Отказано. Вы должны состоять в специальной группе для доступа к функциям бота.")
         root_logger.info(f'/start: access denied user: {check_usr.user.username}, status: {check_usr.status}')
@@ -63,7 +63,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
     
     if (check_usr.status == "creator") or (check_usr.status == 'administrator'):
         await asyncio.sleep(0.3)
-        await message.answer('Вы администратор, дополнительные функции по кнопке ↓', reply_markup=adm_button.as_markup())
+        await message.answer('Админские функции', reply_markup=adm_button.as_markup())
         root_logger.warning(f'Admin: {check_usr.status}. ID: {message.from_user.id}')
 
 @router.message(lambda message: message.contact is not None, Form.num_phone)
@@ -116,7 +116,7 @@ async def send_zakazat_propusk(query: types.CallbackQuery, state: FSMContext):
         load_bd()
         from_state = (find_in_bd(usr_id=str(query.from_user.id)))
         await state.update_data(company_stat=from_state)
-    await query.message.answer(text=f"Введите данные посетителя:\nДля пешего: фамилия, имя, отчество \nДля автомобиля: Полный номер ТС")
+    await query.message.answer(text=f"Введите данные посетителя:\nДля пешего: фамилия, имя, отчество \nДля автомобиля: полный номер ТС")
     root_logger.warning(f'Load bd. id: {query.from_user.id}')
     await state.set_state(Form.sms)
 
@@ -163,7 +163,7 @@ async def callb_msg(query: types.CallbackQuery, state: FSMContext):
         await query.message.answer(error_send_propusk)
         return
 
-    await asyncio.sleep(1.1)
+    await asyncio.sleep(1)
     await bot.edit_message_text(text=f"Заявка передана на охрану с данными:\n{sms}",
                                 chat_id=query.message.chat.id,
                                 message_id=query.message.message_id,
@@ -172,7 +172,8 @@ async def callb_msg(query: types.CallbackQuery, state: FSMContext):
     to_html(dt)
     root_logger.warning(f'Message in OHRANA. ID: {usr.id}, user: {usr.full_name}')
     root_logger.info(msg_text)
-    ohrana_logger.info(f"От {usr_comp} Для: {sms_processed.replace('\n', '. ')}")
+    sms_processed_log = sms_processed.replace('\n', '. ')
+    ohrana_logger.info(f"ID:{usr.id} От {usr_comp} Для: {sms_processed_log}")
     await state.clear()
 
 @router.callback_query(F.data == "cancel")
@@ -211,24 +212,25 @@ def build_repair_message(data: dict, user: types.User, include_sender: bool = Tr
         f"Адрес: {address}\n"
         f"Описание: {description}"
     )
-#добавить отображение подписи как записано в bd.txt, удалить дубль user.id из отображения
     if include_sender:
-        from_bd_name = find_in_bd(user.id)
+        from_bd_name = find_in_bd(str(user.id))
         username = f"@{user.username}" if user.username else "не указан"
-        text += f"\nОт: {username} ({user.full_name}), ID: {user.id}\n
-        {from_bd_name}"
+        text += f"\nОт: {username} ({user.full_name}), ID: {user.id}"
+        if from_bd_name != "null":
+            text += f"\n{from_bd_name}"
 
     return text
 
 @router.callback_query(F.data == "repair_request")
 async def start_repair_request(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     if not REPAIR_REQUESTS_ENABLED:
         await query.message.answer("Функция заявок на ремонт временно недоступна.")
         return
     await state.clear()
     await query.message.answer(
-        "Выберите категорию заявки:",
+        "Выберите категорию заявки",
         reply_markup=get_repair_categories_keyboard()
     )
     await state.set_state(Form.repair_category)
@@ -236,9 +238,10 @@ async def start_repair_request(query: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.in_(REPAIR_CATEGORY_LABELS.keys()))
 async def select_repair_category(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     category = REPAIR_CATEGORY_LABELS.get(query.data)
     await state.update_data(repair_category=category)
-    await query.message.answer("Укажите место (адрес/корпус, этаж, офис)")
+    await query.message.answer("Укажите адрес/корпус, этаж, офис")
     await state.set_state(Form.repair_address)
 
 @router.message(Form.repair_address)
@@ -259,12 +262,18 @@ async def input_repair_description(message: Message, state: FSMContext):
 @router.callback_query(F.data == "repair_skip_media")
 async def skip_repair_media(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+
     data = await state.get_data()
-    preview_text = build_repair_message(data, query.from_user, include_sender=False)
-    await query.message.answer(
+    preview_text = build_repair_message(
+        data,
+        query.from_user,
+        include_sender=False
+    )
+    await query.message.edit_text(
         f"Проверьте данные заявки:\n\n{preview_text}",
         reply_markup=get_repair_confirm_keyboard()
     )
+
     await state.set_state(Form.repair_confirm)
 
 @router.message(Form.repair_media)
@@ -294,6 +303,7 @@ async def capture_repair_media(message: Message, state: FSMContext):
 @router.callback_query(F.data == "repair_confirm_send")
 async def send_repair_request(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     data = await state.get_data()
     #check data !=None
     if not data or not data.get("repair_description"):
@@ -339,10 +349,50 @@ async def send_repair_request(query: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "repair_confirm_cancel")
 async def cancel_repair_request(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
+    await query.message.edit_reply_markup()
     await state.clear()
     await query.message.answer("Заявка отменена.")
 
-@router.message(F.text)
-async def lovim_text(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer('Ошибка. Отправляйте данные согласно диалогу.\nИспользуйте команду: /start')
+@router.callback_query(F.data == "repair_done")
+async def mark_repair_done(query: types.CallbackQuery):
+    await query.answer()
+    if query.message.chat.id != AXO_ID:
+        return
+    user = query.from_user
+    from_bd_name = find_in_bd(str(user.id))
+    username = f"@{user.username}" if user.username else "не указан"
+    executor = f"{username} ({user.full_name}), ID: {user.id}"
+    if from_bd_name != "null":
+        executor += f", {from_bd_name}"
+
+    done_note = f"\n\n✅ Заявка выполнена: {executor}"
+
+    message_text = query.message.text or ""
+    message_caption = query.message.caption or ""
+    base_text = message_caption if message_caption else message_text
+
+    if "✅ Заявка выполнена" in base_text:
+        await query.message.answer("Заявка уже отмечена как выполненная.")
+        return
+
+    updated_text = f"{base_text}{done_note}"
+    try:
+        if message_caption:
+            await bot.edit_message_caption(
+                chat_id=query.message.chat.id,
+                message_id=query.message.message_id,
+                caption=updated_text,
+                reply_markup=None,
+            )
+        else:
+            await bot.edit_message_text(
+                chat_id=query.message.chat.id,
+                message_id=query.message.message_id,
+                text=updated_text,
+                reply_markup=None,
+            )
+    except Exception as exc:
+        uk_logger.error(f"Ошибка обновления статуса заявки: {exc}")
+        await query.message.answer("Не удалось обновить статус заявки. Повторите позже.")
+
+
