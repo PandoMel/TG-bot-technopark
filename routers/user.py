@@ -235,6 +235,14 @@ async def start_repair_request(query: types.CallbackQuery, state: FSMContext):
     )
     await state.set_state(Form.repair_category)
 
+@router.callback_query(F.data == "repair_cancel")
+async def cancel_repair_request_early(query: types.CallbackQuery, state: FSMContext):
+  await query.answer()
+  await query.message.edit_reply_markup()
+  await state.clear()
+  await query.message.answer("Заявка отменена.")
+
+
 @router.callback_query(F.data.in_(REPAIR_CATEGORY_LABELS.keys()))
 async def select_repair_category(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
