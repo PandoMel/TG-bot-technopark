@@ -60,6 +60,7 @@ def get_repair_categories_keyboard():
     kb.add(types.InlineKeyboardButton(text="💡 Освещение", callback_data="repair_cat_light"))
     kb.add(types.InlineKeyboardButton(text="🚿 Вода/Отопление", callback_data="repair_cat_water"))
     kb.add(types.InlineKeyboardButton(text="🧹 Другое", callback_data="repair_cat_other"))
+    kb.add(types.InlineKeyboardButton(text="❌ Отмена", callback_data="repair_cancel"))
     kb.adjust(1)
     return kb.as_markup()
 
