@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from aiogram import types
 from config import bot, CHANNEL_ID, PATH_GROUP_MEMBERS, PATH_KPP_LOG, TIME_WINDOW
-from database import sent_messages
+from database import del_bd, find_return_ID, load_bd, sent_messages
 from logging_module import root_logger
 
 async def check_members(message: types.Message):
@@ -45,6 +45,7 @@ async def reset_sent_messages():
         await asyncio.sleep(wait_time)
         sent_messages.clear()
 
+
 def tail(f, lines=20):
     total_lines_wanted = lines
     BLOCK_SIZE = 1024
@@ -68,12 +69,14 @@ def tail(f, lines=20):
     text_out = all_read_text.decode('utf-8')
     return text_out
 
+
 def tail_len(f, lines=25):
         read = f.readlines()
         full_length = len(read)
         log = (read[full_length - lines:])
         print(''.join(log))
         return str(''.join(log))
+
 
 def load_group_members() -> dict:
     if not Path(PATH_GROUP_MEMBERS).exists():
@@ -87,12 +90,14 @@ def load_group_members() -> dict:
         root_logger.warning(f"Ошибка чтения файла участников группы: {exc}")
     return {}
 
+
 def save_group_members(data: dict) -> None:
     try:
         with open(PATH_GROUP_MEMBERS, 'w', encoding='utf-8') as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
     except OSError as exc:
         root_logger.warning(f"Ошибка записи файла участников группы: {exc}")
+
 
 def add_group_member(user: types.User) -> None:
     data = load_group_members()
@@ -103,17 +108,31 @@ def add_group_member(user: types.User) -> None:
     }
     save_group_members(data)
 
+
 def remove_group_member(user_id: int) -> None:
     data = load_group_members()
     data.pop(str(user_id), None)
     save_group_members(data)
 
+
 def get_group_member(user_id: int) -> dict | None:
     data = load_group_members()
     return data.get(str(user_id))
 
+
 def list_group_members() -> dict:
     return load_group_members()
+
+
+def delete_registration_by_user_id(user_id: int) -> bool:
+    """Удаляет регистрацию пользователя из Legacy БД по Telegram ID."""
+    load_bd()
+    index = find_return_ID(str(user_id))
+    if index == -1:
+        return False
+    del_bd(index)
+    return True
+
 
 def get_recent_passes_for_user(user_id: int, limit: int = 5) -> list[str]:
     if not Path(PATH_KPP_LOG).exists():
