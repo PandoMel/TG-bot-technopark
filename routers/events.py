@@ -7,7 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from access_control import get_group_administrators
 from config import CHANNEL_ID
 from logging_module import root_logger
-from services import add_group_member, remove_group_member
+from services import add_group_member, delete_registration_by_user_id, remove_group_member
 
 router = Router()
 
@@ -62,6 +62,7 @@ async def user_left_chat(event: ChatMemberUpdated, bot: Bot):
     user = event.new_chat_member.user
     actor = event.from_user
     remove_group_member(user.id)
+    registration_deleted = delete_registration_by_user_id(user.id)
     username = f"@{user.username}" if user.username else "отсутствует"
 
     if actor.id == user.id:
@@ -75,11 +76,14 @@ async def user_left_chat(event: ChatMemberUpdated, bot: Bot):
         "GROUP_MEMBER_LEFT "
         f"user_id={user.id} username={username} full_name={user.full_name!r} "
         f"reason={reason!r} old_status={event.old_chat_member.status} "
-        f"new_status={event.new_chat_member.status}"
+        f"new_status={event.new_chat_member.status} "
+        f"registration_deleted={registration_deleted}"
     )
     await notify_administrators(
         bot,
         "Пользователь покинул чат:\n"
-        f"ID: {user.id}\nUsername: {username}\nИмя: {user.full_name}\nПричина: {reason}",
+        f"ID: {user.id}\nUsername: {username}\nИмя: {user.full_name}\n"
+        f"Причина: {reason}\n"
+        f"Регистрация в БД: {'удалена' if registration_deleted else 'не найдена'}",
         user.id,
     )

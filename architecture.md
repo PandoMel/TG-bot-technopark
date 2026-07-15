@@ -1,139 +1,234 @@
-# Architecture Documentation
+# Архитектура TG-bot-propusk
 
-## Project Structure Overview
+## Назначение
 
-```
+Проект представляет собой монолитный Telegram-бот на `aiogram 3.14.0`. Доступ к пользовательским функциям определяется членством в основной группе `CHANNEL_ID`. Административные права определяются текущим статусом пользователя в этой же группе.
+
+## Структура
+
+```text
 project/
-├── bot.py # Entry point: Bot initialization, dispatcher setup, polling
-├── config.py # Central configuration: tokens, IDs, text constants, Bot instance
-├── FSMstates.py # FSM State definitions for workflows
-├── keyboards.py # Unified keyboard builders (inline/reply)
-├── database.py # Data Layer: In-memory arrays + file I/O for bd.txt
-├── services.py # Business logic: access control, anti-flood, tail readers
-├── html_export.py # HTML file management for pass records
-├── logging_module.py # Infrastructure: Logging setup (renamed from logging.py)
+├── bot.py                 # Dispatcher, middleware, роутеры, polling
+├── config.py              # Bot, ID чатов, пути и настройки
+├── database.py            # Legacy bd.txt + глобальные in-memory списки
+├── services.py            # Бизнес-логика и работа с JSON/регистрацией
+├── access_control.py      # Проверка доступа, админов и синхронизация
+├── middlewares.py         # Общая защита личного чата и админки
+├── logging_module.py      # Ротация bot.log, KPP.log и UK.log
+├── keyboards.py           # Клавиатуры
+├── FSMstates.py           # Legacy FSM-состояния
+├── html_export.py         # HTML-журнал пропусков
 ├── routers/
-│ ├── init.py
-│ ├── user.py # User workflows: /start, registration, pass ordering
-│ ├── admin.py # Admin functions: search, edit, delete, logs
-│ └── events.py # System events: user join/leave notifications
-├── bd.txt # Flat-file database (ID;Company;Phone)
-├── phone.txt # Supplementary contact file
-├── README.md
-└── architecture.md # This file
+│   ├── user.py            # Регистрация, пропуска, ремонт
+│   ├── admin.py           # Legacy-функции админки
+│   ├── admin_users.py     # Профиль, сообщения и редактирование
+│   ├── admin_cleanup.py   # Связанное удаление из группы и bd.txt
+│   ├── events.py          # Вступления, выходы и исключения
+│   └── fallback.py        # Необработанный ввод и старые кнопки
+├── bd.txt
+├── group_members.json
+├── bot.log
+├── KPP.log
+└── UK.log
 ```
 
+## Слой данных
 
-## Module Responsibilities
+### `database.py` и `bd.txt`
 
-### Core Modules
+`database.py` является Legacy-компонентом. Он хранит данные в глобальных списках `id`, `company`, `phone` и синхронизирует их с `bd.txt`.
 
-**config.py**
-- Initializes the `Bot` instance (to avoid circular imports).
-- Stores secrets (Tokens, IDs) and constants (`TIME_WINDOW`).
-- Contains static text strings (Help commands, manuals).
+Формат файла остается неизменным:
 
-**FSMstates.py**
-- `Form(StatesGroup)`: Defines all states for user registration (`fio`, `company_stat`) and admin operations (`edit_db`, `adm_find`).
-
-**keyboards.py**
-- `builder`: Main inline keyboard for users.
-- `key_builder`: Reply keyboard for contact sharing.
-- `adm_keys`: Admin menu builder.
-- Helper functions like `get_delete_button(user_id)`.
-
-**logging_module.py**
-- Configures `RotatingFileHandler` for `bot.log` (general logs).
-- Configures `RotatingFileHandler` for `KPP.log` (security/access logs).
-- Defines formatters for log entries.
-
-### Router Modules (routers/)
-
-**user.py**
-- `/start`: Initializes user session, checks DB presence.
-- Registration flow: Contact share → Company name → Name input -> Save to DB.
-- Pass ordering (`send_zakazat_propusk`): Inputs pass details -> Validates -> Sends to `OHRANA_ID`.
-
-**admin.py**
-- Admin menu handling (`edit_bd`, `load_bd`, `del_bd`).
-- Search functionality (`func_find`).
-- Log viewing via Telegram (`cat_log`, `cat_KPP`).
-- Database manual reloading.
-
-**events.py**
-- Monitors `ChatMemberUpdated` events.
-- Notifications: Alerts admins when users join/leave the main chat.
-
-### Service Modules
-
-**database.py**
-- **State**: Global arrays `id`, `company`, `phone` acting as in-memory cache.
-- `load_bd()`: Parses `bd.txt` into arrays.
-- `save_bd()`: Serializes arrays back to `bd.txt`.
-- `find_in_bd()` / `find_by_name()`: Search logic (exact and partial match).
-- `input_bd()` / `del_bd()`: Cache modification methods.
-
-**services.py**
-- **Access Control**: `check_members()` checks user status in `CHANNEL_ID`.
-- **Anti-Flood**: `can_send_message()` & `reset_sent_messages()` prevents duplicate pass requests within `TIME_WINDOW`.
-- **File Utils**: `tail()` and `tail_len()` for reading log files in chunks for Telegram.
-
-**html_export.py**
-- `to_html()`: Appends new pass records to `index.html`.
-- Handles simple file rotation (checks date change in file header).
-- Applies visual formatting (e.g., red color for "Administration" passes).
-
-### Entry Point
-
-**bot.py**
-- Sets up `Dispatcher`.
-- Includes routers (`user`, `admin`, `events`).
-- Registers bot commands (`/start`, `/help`, `/status`).
-- Starts the `reset_sent_messages` background task.
-- Initiates polling.
-
-## Data Flow
-
-### Registration Flow
-
-```
-/start → Check user in CHANNEL_ID
-  ├─ User NOT in channel → Access Denied
-  └─ User in channel
-    ├─ ID in Database → Show "Order Pass" button
-    └─ ID NOT in Database:
-        → Request Contact
-        → Contact Shared
-        → Request Company
-        → FIO Input
-        → Save to Memory & File → Restart(/start)
+```text
+ID;Компания + ФИО;Телефон
 ```
 
-### Pass Ordering Flow
-```
-Order button → Input pass details (vehicle/visitor)
-  → Confirmation → Duplicate check
-      ├─ Cancel → Reset State
-      └─ Confirm → Anti-Flood Check
-        ├─ Duplicate → Reject
-        └─ Unique
-            → Log to HTML
-            → Log to KPP logger
-            → Show success + instructions
+Используется Write-Through Cache:
+
+1. `load_bd()` загружает файл в память;
+2. изменения выполняются в списках;
+3. `save_bd()` сразу перезаписывает файл;
+4. `del_bd()` удаляет запись и сохраняет файл.
+
+Новые функции не меняют формат файла и не переводят Legacy-БД на ORM или SQL.
+
+### `group_members.json`
+
+JSON хранит только текущих известных участников основной группы:
+
+- Telegram ID;
+- username;
+- полное имя;
+- дата последнего зафиксированного вступления.
+
+История вышедших пользователей в JSON не хранится. После выхода запись удаляется. Полная информация о событии остается в `bot.log`.
+
+## Контроль доступа
+
+### `access_control.py`
+
+Модуль отвечает за:
+
+- проверку членства в `CHANNEL_ID`;
+- проверку статуса `administrator` или `creator`;
+- получение актуального списка администраторов;
+- логирование отказов;
+- синхронизацию известных пользователей при запуске.
+
+Допустимые пользовательские статусы:
+
+- `member`;
+- `administrator`;
+- `creator`;
+- `restricted`, только когда `is_member=True`.
+
+Отдельный список администраторов не используется. Источником прав является Telegram-группа.
+
+### `middlewares.py`
+
+`GroupAccessMiddleware` проверяет любые сообщения и callback-запросы в личном чате. При отказе:
+
+- обработчик не запускается;
+- пользователь получает `Доступ запрещен`;
+- событие записывается как `ACCESS_DENIED`.
+
+`AdminAccessMiddleware` дополнительно защищает административные callback-запросы и FSM-состояния. Попытка пользователя без прав записывается как `ADMIN_ACCESS_DENIED`.
+
+## Синхронизация при запуске
+
+Перед polling выполняется `sync_known_group_members()`.
+
+Проверяются ID из:
+
+1. `bd.txt`;
+2. `group_members.json`;
+3. текущего списка администраторов группы.
+
+Для каждого известного ID вызывается `get_chat_member()`:
+
+- действующий участник добавляется или обновляется в JSON;
+- пользователь без доступа удаляется из JSON;
+- ошибки записываются в лог и не останавливают запуск.
+
+Telegram Bot API не предоставляет полный список всех обычных участников, поэтому неизвестные ранее пользователи обнаруживаются по событиям группы или при взаимодействии с ботом.
+
+## События группы
+
+`routers/events.py` обрабатывает только события `CHANNEL_ID`.
+
+### Вступление
+
+1. пользователь добавляется в `group_members.json`;
+2. событие записывается как `GROUP_MEMBER_JOINED`;
+3. актуальные администраторы получают уведомление и ссылку на профиль по ID.
+
+### Самостоятельный выход или исключение
+
+1. пользователь удаляется из `group_members.json`;
+2. его регистрация удаляется из `bd.txt` через `delete_registration_by_user_id()`;
+3. определяется причина: самостоятельный выход, исключение администратором или ботом;
+4. событие записывается как `GROUP_MEMBER_LEFT`;
+5. администраторы получают уведомление о результате удаления регистрации.
+
+## Административное управление
+
+### `routers/admin_users.py`
+
+Предоставляет:
+
+- поиск пользователя по ID, компании или фамилии;
+- профиль Telegram с `tg://user?id=...`;
+- данные регистрации;
+- последние заявки на пропуск;
+- отправку личного сообщения;
+- редактирование компании, ФИО и телефона;
+- подтверждение опасных действий.
+
+### `routers/admin_cleanup.py`
+
+Роутер подключается перед `admin_users.py` и обрабатывает подтверждение удаления или блокировки.
+
+После успешного Telegram-действия он:
+
+1. удаляет пользователя из `group_members.json`;
+2. удаляет регистрацию из `bd.txt`;
+3. пишет административное действие в `bot.log`;
+4. сообщает администратору результат.
+
+Обработчик `events.py` повторно проверяет удаление регистрации. Повторный вызов безопасен: если записи уже нет, функция возвращает `False`.
+
+Разблокировка не восстанавливает регистрацию. Для повторной работы пользователь должен снова вступить в группу и пройти регистрацию.
+
+## Потоки
+
+### Доступ пользователя
+
+```text
+Сообщение/callback в личном чате
+  → GroupAccessMiddleware
+    → get_chat_member(CHANNEL_ID, user_id)
+      ├─ доступ есть → запуск обработчика
+      └─ доступа нет → ACCESS_DENIED + отказ
 ```
 
-### Admin Search Flow
-```
-Admin search → Query database
-  ├─ No matches → Show "not found"
-  ├─ Multiple matches → Ask to be more specific
-  └─ Single match → Show user info + delete button (optional)
+### Административное действие
+
+```text
+Админская кнопка
+  → GroupAccessMiddleware
+  → AdminAccessMiddleware
+  → проверка administrator/creator
+    ├─ разрешено → обработчик
+    └─ запрещено → ADMIN_ACCESS_DENIED
 ```
 
-## Key Design Decisions
+### Удаление пользователя
 
-1. **Hybrid Database**: Uses in-memory arrays for O(1)/O(n) speed during operation, syncing to disk on every write.
-2. **Log Rotation**: Implemented via Python's `logging.handlers` to prevent disk overflow.
-3. **Circular Import Prevention**: `Bot` instance moved to `config.py` to be accessible by both Routers and Services.
-4. **Service Separation**: Logic for checking permissions and reading files separated from message handlers.
-5. **HTML Export**: simple "append-only" logic for web-view of current passes.
+```text
+Подтверждение удаления
+  → ban_chat_member
+  → unban_chat_member (разрешить повторное вступление)
+  → удалить из group_members.json
+  → удалить из bd.txt
+  → записать ADMIN_USER_REMOVED
+  → событие GROUP_MEMBER_LEFT подтверждает состояние
+```
+
+### Блокировка пользователя
+
+```text
+Подтверждение блокировки
+  → ban_chat_member
+  → удалить из group_members.json
+  → удалить из bd.txt
+  → записать ADMIN_USER_BANNED
+```
+
+## Перезапуск и обновления
+
+В `bot.py` используется:
+
+```python
+await bot.delete_webhook(drop_pending_updates=True)
+```
+
+Это сделано намеренно: старые callback-обновления от кнопок, созданных до перезапуска, не должны выполняться после изменения состояния приложения.
+
+## Логирование
+
+- `bot.log` — доступ, групповые события, административные действия и ошибки;
+- `KPP.log` — заявки на пропуск;
+- `UK.log` — заявки на ремонт.
+
+Логи ротируются через `RotatingFileHandler`.
+
+## Архитектурные инварианты
+
+1. Формат `bd.txt` не изменяется без отдельной задачи миграции.
+2. `database.py` не переписывается в классы, ORM или SQL без явного решения.
+3. Любое прекращение членства в основной группе удаляет регистрацию пользователя.
+4. Разблокировка пользователя не восстанавливает удаленную регистрацию.
+5. Административные права всегда проверяются через Telegram перед действием.
+6. Старые callback-обновления после перезапуска отбрасываются.
+7. Ошибка уведомления одного администратора не должна останавливать обработку события.
