@@ -17,6 +17,7 @@ ADMIN_STATES = {
     "Form:adm_user_profile", "Form:adm_company_list",
     "AdminUserForm:find", "AdminUserForm:profile", "AdminUserForm:edit_company",
     "AdminUserForm:edit_phone", "AdminUserForm:message_text", "AdminUserForm:message_confirm",
+    "AdminMenuForm:user_search",
 }
 
 
