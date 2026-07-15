@@ -9,6 +9,7 @@ from logging_module import root_logger
 from services import delete_registration_by_user_id, remove_group_member
 
 router = Router()
+PROTECTED_STATUSES = {"administrator", "creator"}
 
 
 class GroupAdminFilter(BaseFilter):
@@ -26,10 +27,33 @@ def user_id_from_callback(data: str) -> int:
     return int(data.rsplit("_", 1)[-1])
 
 
+async def target_can_be_removed(query: types.CallbackQuery, user_id: int) -> bool:
+    try:
+        member = await bot.get_chat_member(CHANNEL_ID, user_id)
+    except TelegramBadRequest as exc:
+        await query.message.answer(f"Не удалось проверить пользователя: {exc}")
+        return False
+
+    if member.status in PROTECTED_STATUSES:
+        await query.message.answer(
+            "Нельзя удалить или заблокировать администратора либо владельца группы. "
+            "Сначала измените его права непосредственно в Telegram."
+        )
+        root_logger.warning(
+            f"ADMIN_USER_REMOVE_BLOCKED admin_id={query.from_user.id} "
+            f"target_id={user_id} status={member.status}"
+        )
+        return False
+    return True
+
+
 @router.callback_query(lambda callback: callback.data and callback.data.startswith("adm_confirm_remove_"))
 async def confirm_remove(query: types.CallbackQuery):
     await query.answer()
     user_id = user_id_from_callback(query.data)
+    if not await target_can_be_removed(query, user_id):
+        return
+
     try:
         await bot.ban_chat_member(CHANNEL_ID, user_id)
         await bot.unban_chat_member(CHANNEL_ID, user_id, only_if_banned=True)
@@ -53,6 +77,9 @@ async def confirm_remove(query: types.CallbackQuery):
 async def confirm_ban(query: types.CallbackQuery):
     await query.answer()
     user_id = user_id_from_callback(query.data)
+    if not await target_can_be_removed(query, user_id):
+        return
+
     try:
         await bot.ban_chat_member(CHANNEL_ID, user_id)
     except TelegramBadRequest as exc:

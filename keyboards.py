@@ -11,7 +11,7 @@ builder.add(types.InlineKeyboardButton(
     text="🎫 Заказ пропуска",
     callback_data="Заказать пропуск"))
 if REPAIR_REQUESTS_ENABLED and REPAIR_SEND_ENABLED:
-    builder.add(types.InlineKeyboardButton( #builder.row для расположения в 2 строки кнопок, либо builder.add для одной строки
+    builder.add(types.InlineKeyboardButton(
         text="🛠 Заявка на ремонт",
         callback_data="repair_request"))
 
@@ -31,20 +31,82 @@ adm_button.add(types.InlineKeyboardButton(
     text="Администраторское меню",
     callback_data="admins"))
 
-admKeyList = [
-    [types.InlineKeyboardButton(text='Поиск данных пользователя', callback_data='find_bd')],
-    [types.InlineKeyboardButton(text='Профиль пользователя по ID', callback_data='user_profile')],
-    [types.InlineKeyboardButton(text='Просмотреть список компании', callback_data='company_list')],
-    [types.InlineKeyboardButton(text='Показать незарегистрированных в группе', callback_data='unregistered_members')],
-    [types.InlineKeyboardButton(text='Редактировать пользователя в БД', callback_data='edit_bd')],
-    [types.InlineKeyboardButton(text='Удалить регистрацию пользователя в БД', callback_data='del_bd')],
-    [types.InlineKeyboardButton(text='Загрузить БД из файла в память', callback_data='load_bd')],
-    [types.InlineKeyboardButton(text='Показать(файл) БД', callback_data='cat_bd')],
-    [types.InlineKeyboardButton(text='Просмотр посл. заявок пропусков', callback_data='cat_KPP')],
-    [types.InlineKeyboardButton(text='Показать логи бота', callback_data='cat_log')],
-    [types.InlineKeyboardButton(text='Получить контакт пользователя', callback_data='phone')]
-]
-adm_keys = InlineKeyboardBuilder(admKeyList)
+
+def get_admin_main_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.row(types.InlineKeyboardButton(
+        text="👤 Действия с пользователями",
+        callback_data="adm_users_menu",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="🏢 Компании",
+        callback_data="adm_companies_menu",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="🗄 База данных",
+        callback_data="adm_database_menu",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="🛠 Сервисные функции",
+        callback_data="adm_service_menu",
+    ))
+    return kb
+
+
+def get_admin_service_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.row(types.InlineKeyboardButton(
+        text="Последние заявки на пропуск",
+        callback_data="cat_KPP",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="Логи бота",
+        callback_data="cat_log",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="Контакты пользователей",
+        callback_data="phone",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="⬅️ Назад",
+        callback_data="adm_back_main",
+    ))
+    return kb
+
+
+def get_admin_database_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.row(types.InlineKeyboardButton(
+        text="Показать файл БД",
+        callback_data="cat_bd",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="Перезагрузить БД из файла",
+        callback_data="load_bd",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="⬅️ Назад",
+        callback_data="adm_back_main",
+    ))
+    return kb
+
+
+def get_admin_companies_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.row(types.InlineKeyboardButton(
+        text="Сотрудники компании",
+        callback_data="company_list",
+    ))
+    kb.row(types.InlineKeyboardButton(
+        text="⬅️ Назад",
+        callback_data="adm_back_main",
+    ))
+    return kb
+
+
+# Совместимость со старым обработчиком routers/admin.py.
+adm_keys = get_admin_main_keyboard()
+
 
 def get_delete_button(user_id: int):
     kb = InlineKeyboardBuilder()
@@ -53,6 +115,7 @@ def get_delete_button(user_id: int):
         callback_data=f'del_users_from_group_{user_id}'
     ))
     return kb.as_markup()
+
 
 def get_repair_categories_keyboard():
     kb = InlineKeyboardBuilder()
@@ -64,10 +127,12 @@ def get_repair_categories_keyboard():
     kb.adjust(1)
     return kb.as_markup()
 
+
 def get_repair_skip_media_keyboard():
     kb = InlineKeyboardBuilder()
     kb.add(types.InlineKeyboardButton(text="Пропустить", callback_data="repair_skip_media"))
     return kb.as_markup()
+
 
 def get_repair_confirm_keyboard():
     kb = InlineKeyboardBuilder()
@@ -75,6 +140,7 @@ def get_repair_confirm_keyboard():
     kb.add(types.InlineKeyboardButton(text="Отмена", callback_data="repair_confirm_cancel"))
     kb.adjust(2)
     return kb.as_markup()
+
 
 def get_repair_status_keyboard():
     kb = InlineKeyboardBuilder()
