@@ -6,7 +6,7 @@ from aiogram import Dispatcher
 from access_control import sync_known_group_members
 from config import bot, bot_commands
 from middlewares import AdminAccessMiddleware, GroupAccessMiddleware
-from routers import admin, admin_cleanup, admin_users, events, fallback, user
+from routers import admin, admin_cleanup, admin_menu, admin_users, events, fallback, user
 from services import reset_sent_messages
 
 # Импортируем, чтобы запустить конфигурацию логгера
@@ -19,6 +19,7 @@ dp.message.outer_middleware(AdminAccessMiddleware())
 dp.callback_query.outer_middleware(GroupAccessMiddleware())
 dp.callback_query.outer_middleware(AdminAccessMiddleware())
 dp.include_router(user.router)
+dp.include_router(admin_menu.router)
 dp.include_router(admin_cleanup.router)
 dp.include_router(admin_users.router)
 dp.include_router(admin.router)
